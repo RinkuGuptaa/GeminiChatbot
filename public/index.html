@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Chatbot</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-mode">
+    <div class="app-container">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3 style="color: var(--text); margin: 0; font-size: 1.1em;">Chat History</h3>
+                <button class="theme-toggle" id="themeToggle" title="Toggle theme">☀️</button>
+            </div>
+            <div class="sidebar-content">
+                <button class="new-chat-btn" id="newChatBtn">
+                    + New chat
+                </button>
+                <div class="save-toggle">
+                    <span>Save to history</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="saveToggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="chat-history" id="chatHistory">
+                    <!-- Chat history will be populated here -->
+                </div>
+            </div>
+        </div>
+        <div class="main">
+            <div id="chatbox">
+                <div class="welcome-message">
+                    <h2>Welcome to Gemini</h2>
+                    <p>Start a new chat or select from your history</p>
+                    <p>Ask me anything!</p>
+                </div>
+            </div>
+            <div class="input-area">
+                <textarea id="userInput" placeholder="Type your message..." autocomplete="off" rows="1"></textarea>
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+        <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+    </div>
+ <script src="script.js"></script>
+    
+</body>
+</html>
