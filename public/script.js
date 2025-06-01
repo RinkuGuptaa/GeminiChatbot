@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+ document.addEventListener('DOMContentLoaded', () => {
         const chatbox = document.getElementById('chatbox');
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
@@ -10,13 +10,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const saveToggle = document.getElementById('saveToggle');
         const body = document.body;
 
-        let currentChatId = null; // Will be set by startNewChat or loadChat
-        let chatHistoryData = JSON.parse(localStorage.getItem('geminiChatHistory')) || [];
+        let currentChatId = null; 
+        let chatHistoryData = JSON.parse(localStorage.getItem('geminiChatHistoryPrepPortal')) || []; // Unique LS key
         let isRenaming = null;
-        let saveToHistoryEnabled = true; // Default, will be updated from localStorage
+        let saveToHistoryEnabled = true; 
 
         function initTheme() {
-            const savedTheme = localStorage.getItem('theme');
+            const savedTheme = localStorage.getItem('prepPortalTheme'); // Unique LS key
             const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
                 body.classList.add('dark-mode');
@@ -35,11 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
             body.classList.toggle('dark-mode');
             body.classList.toggle('light-mode');
             if (body.classList.contains('dark-mode')) {
-                localStorage.setItem('theme', 'dark');
+                localStorage.setItem('prepPortalTheme', 'dark');
                 themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
                 themeToggle.title = 'Switch to light mode';
             } else {
-                localStorage.setItem('theme', 'light');
+                localStorage.setItem('prepPortalTheme', 'light');
                 themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
                 themeToggle.title = 'Switch to dark mode';
             }
@@ -48,27 +48,30 @@ document.addEventListener('DOMContentLoaded', () => {
         mobileMenuBtn.addEventListener('click', () => {
             sidebar.classList.toggle('active');
             mobileMenuBtn.innerHTML = sidebar.classList.contains('active') ? '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
+            if (sidebar.classList.contains('active')) {
+                sidebar.scrollTop = 0; 
+            }
         });
 
         saveToggle.addEventListener('change', function() {
             saveToHistoryEnabled = this.checked;
-            localStorage.setItem('saveChatHistoryPreference', saveToHistoryEnabled);
+            localStorage.setItem('prepPortalSaveHistoryPref', saveToHistoryEnabled); // Unique LS key
         });
 
         function loadSavePreference() {
-            const savedPref = localStorage.getItem('saveChatHistoryPreference');
+            const savedPref = localStorage.getItem('prepPortalSaveHistoryPref');
             if (savedPref !== null) {
                 saveToHistoryEnabled = JSON.parse(savedPref);
                 saveToggle.checked = saveToHistoryEnabled;
             } else {
-                saveToggle.checked = true; // Default if not set
+                saveToggle.checked = true; 
                 saveToHistoryEnabled = true;
             }
         }
         
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
-            const newHeight = Math.min(this.scrollHeight, 120); // Max height 120px
+            const newHeight = Math.min(this.scrollHeight, 120); 
             this.style.height = newHeight + 'px';
         });
 
@@ -91,8 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const chatItem = document.createElement('div');
                 chatItem.className = 'chat-item';
                 if (chat.id === currentChatId) {
-                    chatItem.style.backgroundColor = 'var(--primary-dark)'; // Highlight active chat
-                    chatItem.style.color = 'white';
+                    chatItem.classList.add('active-chat-item');
                 }
 
                 if (isRenaming === chat.id) {
@@ -103,11 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         const newTitle = renameInput.value.trim();
                         if (newTitle) chat.title = newTitle;
                         chat.lastUpdated = Date.now();
-                        localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+                        localStorage.setItem('geminiChatHistoryPrepPortal', JSON.stringify(chatHistoryData));
                         isRenaming = null;
                         renderChatHistoryList();
                     };
-                    renameInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleRename(); });
+                    renameInput.addEventListener('keypress', e => { if (e.key === 'Enter') { e.preventDefault(); handleRename(); } });
                     renameInput.addEventListener('blur', handleRename);
                     chatItem.appendChild(renameInput);
                     setTimeout(() => renameInput.focus(), 0);
@@ -116,9 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     chatText.className = 'chat-item-text';
                     const firstUserMsg = chat.messages.find(m => m.sender === 'user');
                     chatText.textContent = chat.title || (firstUserMsg?.message.substring(0, 25) + (firstUserMsg?.message.length > 25 ? '...' : '')) || `Chat ${chat.id.toString().slice(-4)}`;
-                    if (chat.id === currentChatId) chatText.style.color = 'white';
-
-
+                    
                     const chatActions = document.createElement('div');
                     chatActions.className = 'chat-item-actions';
 
@@ -126,14 +126,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     renameBtn.className = 'chat-action-btn';
                     renameBtn.innerHTML = '<i class="fas fa-pen"></i>';
                     renameBtn.title = 'Rename chat';
-                    if (chat.id === currentChatId) renameBtn.style.color = 'white';
                     renameBtn.addEventListener('click', e => { e.stopPropagation(); isRenaming = chat.id; renderChatHistoryList(); });
 
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'chat-action-btn';
                     deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
                     deleteBtn.title = 'Delete chat';
-                     if (chat.id === currentChatId) deleteBtn.style.color = 'white';
                     deleteBtn.addEventListener('click', e => {
                         e.stopPropagation();
                         if (confirm(`Are you sure you want to delete "${chatText.textContent}"?`)) deleteChat(chat.id);
@@ -157,9 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function deleteChat(chatIdToDelete) {
             chatHistoryData = chatHistoryData.filter(c => c.id !== chatIdToDelete);
-            localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+            localStorage.setItem('geminiChatHistoryPrepPortal', JSON.stringify(chatHistoryData));
             if (currentChatId === chatIdToDelete) {
-                startNewChat();
+                if (chatHistoryData.length > 0) {
+                    loadChat(chatHistoryData[0].id); // Load most recent
+                } else {
+                    startNewChat();
+                }
             }
             renderChatHistoryList();
         }
@@ -179,7 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
             showWelcomeMessage();
             userInput.value = '';
             userInput.style.height = 'auto';
-            renderChatHistoryList(); // To unhighlight previous active chat
+            // Add a new empty chat to history data so it can be titled on first message
+            const newChatEntry = { id: currentChatId, title: null, messages: [], lastUpdated: Date.now() };
+            const existingChatIndex = chatHistoryData.findIndex(c => c.id === currentChatId);
+            if (existingChatIndex === -1) { // Only add if it truly doesn't exist
+                 chatHistoryData.push(newChatEntry);
+            }
+            localStorage.setItem('geminiChatHistoryPrepPortal', JSON.stringify(chatHistoryData)); // Save immediately
+            renderChatHistoryList(); 
         }
         
         newChatBtn.addEventListener('click', () => {
@@ -193,15 +202,18 @@ document.addEventListener('DOMContentLoaded', () => {
         function loadChat(chatIdToLoad) {
             const chat = chatHistoryData.find(c => c.id === chatIdToLoad);
             if (!chat) {
-                console.warn("Chat not found, starting new one:", chatIdToLoad);
-                startNewChat(); // Fallback if chat is somehow missing
+                startNewChat(); 
                 return;
             }
             currentChatId = chatIdToLoad;
             chatbox.innerHTML = '';
-            chat.messages.forEach(msg => addMessageToUI(msg.message, msg.sender, false));
+            if (chat.messages && chat.messages.length > 0) {
+                chat.messages.forEach(msg => addMessageToUI(msg.message, msg.sender, false));
+            } else {
+                showWelcomeMessage(); // Show welcome if a loaded chat has no messages
+            }
             chatbox.scrollTop = chatbox.scrollHeight;
-            renderChatHistoryList(); // To highlight current active chat
+            renderChatHistoryList(); 
         }
         
         function escapeHtml(unsafe) {
@@ -209,81 +221,72 @@ document.addEventListener('DOMContentLoaded', () => {
                  .replace(/&/g, "&")
                  .replace(/</g, "<")
                  .replace(/>/g, ">")
+            
                  .replace(/'/g, "'");
         }
 
         function formatBotMessageContent(content) {
-            // Basic escaping first for safety, then apply markdown-like transformations
-            let htmlContent = escapeHtml(content);
+            let rawContent = content; // Work with the raw content for placeholder replacement
+            const codeBlocks = [];
 
-            // Code blocks (```lang\ncode```) - Handle multiline correctly
-            htmlContent = htmlContent.replace(/```([a-zA-Z]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-                // Unescape things that shouldn't be escaped inside code blocks
-                const unescapedCode = code
-                    .replace(/</g, '<')
-                    .replace(/>/g, '>')
-                    .replace(/&/g, '&');
-                return `<pre><code class="language-${lang || 'plaintext'}">${unescapedCode}</code></pre>`;
-            });
-             // Simpler code blocks (```code```) for single line or unspecified lang
-            htmlContent = htmlContent.replace(/```([\s\S]*?)```/g, (match, code) => {
-                const unescapedCode = code
-                    .replace(/</g, '<')
-                    .replace(/>/g, '>')
-                    .replace(/&/g, '&');
-                return `<pre><code class="language-plaintext">${unescapedCode}</code></pre>`;
+            // 1. Temporarily replace code blocks with placeholders
+            rawContent = rawContent.replace(/```([a-zA-Z]*)\n?([\s\S]*?)```/g, (match, lang, codeText) => {
+                codeBlocks.push({ lang: lang || 'plaintext', code: codeText }); // Store raw code
+                return `%%CODE_BLOCK_${codeBlocks.length - 1}%%`;
             });
 
+            // 2. Escape the entire content that's NOT a code block placeholder
+            let htmlContent = escapeHtml(rawContent);
 
-            // Bold: **text**
+            // 3. Apply Markdown-like formatting to the escaped content
+            // Bold, Italics, Underline (using $1 for captured group)
             htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            // Italics: *text*
             htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
-             // Underline: _text_ (less common in Markdown, but was in your original)
             htmlContent = htmlContent.replace(/_(.*?)_/g, '<u>$1</u>');
-            // Inline code: `code`
-            htmlContent = htmlContent.replace(/`([^`]+)`/g, (match, code) => `<code>${escapeHtml(code)}</code>`); // Re-escape code content just in case
+            
+            // Inline code: `code` - applied to escaped content. Content inside ` ` is already escaped.
+            htmlContent = htmlContent.replace(/`([^`]+?)`/g, '<code>$1</code>');
 
-            // Headlines: #, ##, ###
+            // Headlines (applied to escaped text, $1 is the headline text)
             htmlContent = htmlContent.replace(/^### (.*$)/gim, '<h3>$1</h3>');
             htmlContent = htmlContent.replace(/^## (.*$)/gim, '<h2>$1</h2>');
             htmlContent = htmlContent.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+            
+            // Blockquotes ('> ' was escaped to '> ')
+            htmlContent = htmlContent.replace(/^> (.*)/gim, '<blockquote>$1</blockquote>');
 
-            // Unordered lists: - item or * item
-            htmlContent = htmlContent.replace(/^[\s]*[\-\*] (.*)/gim, '<li>$1</li>');
-            htmlContent = htmlContent.replace(/<\/li>\n<li>/gim, '</li><li>'); // Fix newlines between list items
-            htmlContent = htmlContent.replace(/((<li>.*<\/li>\s*)+)/gim, '<ul>$1</ul>');
+            // Lists: Convert individual list items
+            htmlContent = htmlContent.replace(/^[\s]*[\-\*] (.*)/gim, '<li>$1</li>'); // Unordered
+            htmlContent = htmlContent.replace(/^[\s]*\d+\. (.*)/gim, '<li>$1</li>'); // Ordered
 
-
-            // Ordered lists: 1. item
-            htmlContent = htmlContent.replace(/^[\s]*\d+\. (.*)/gim, '<li>$1</li>');
-            // htmlContent = htmlContent.replace(/<\/li>\n<li>/gim, '</li><li>'); // Already handled
-            htmlContent = htmlContent.replace(/((<li>.*<\/li>\s*)+)/gim, (match, p1, offset, string) => {
-                 // Check if it's already wrapped in <ul> to avoid double wrapping after unordered list pass
-                const preceedingChar = offset > 4 ? string.substring(offset-4, offset) : "";
-                if (preceedingChar === "<ul>") return p1; // already in ul
-                return /<ul><li>.*<\/li><\/ul>/.test(match) ? match :'<ol>$1</ol>';
+            // Wrap consecutive <li> items in <ul>. This is a simplified approach.
+            // A more robust parser would track list type (ul/ol) from the start.
+            htmlContent = htmlContent.replace(/(<li>.*?<\/li>\s*)+/gim, (match) => {
+                return `<ul>${match.replace(/<\/li>\s*<li>/g, '</li><li>')}</ul>`;
             });
 
-
-            // Blockquotes: > quote
-            htmlContent = htmlContent.replace(/^> (.*)/gim, '<blockquote>$1</blockquote>');
-            
-            // Paragraphs: Split by double newlines, then wrap non-list/block elements
-            // This is tricky after other replacements. Simpler: wrap remaining lines in <p> if not already in block.
-            // For simplicity now, just replace single newlines with <br> for non-block elements
-            // A more robust parser would build an AST.
-             return htmlContent.split(/\n\n+|\r\n\r\n+/).map(paragraph => {
-                if (paragraph.match(/^<(ul|ol|li|h[1-3]|blockquote|pre)/)) {
-                    return paragraph; // Already a block element
+            // Paragraphs: Wrap remaining lines/blocks not already handled
+            let finalHtmlOutput = htmlContent.split(/\n\n+|\r\n\r\n+/).map(paragraph => {
+                paragraph = paragraph.trim();
+                if (!paragraph) return '';
+                if (paragraph.match(/^<(ul|ol|h[1-3]|blockquote|pre|li)/i) || paragraph.startsWith('%%CODE_BLOCK_')) {
+                    return paragraph;
                 }
-                return `<p>${paragraph.replace(/\n|\r\n/g, '<br>')}</p>`; // Wrap in <p> and convert inner newlines
+                return `<p>${paragraph.replace(/\n|\r\n/g, '<br>')}</p>`;
             }).join('');
+
+            // 4. Restore actual code blocks, NOW escaping their original content
+            finalHtmlOutput = finalHtmlOutput.replace(/%%CODE_BLOCK_(\d+)%%/g, (match, index) => {
+                const block = codeBlocks[parseInt(index)];
+                return `<pre><code class="language-${block.lang}">${escapeHtml(block.code)}</code></pre>`;
+            });
+            
+            return finalHtmlOutput;
         }
 
 
         function addMessageToUI(message, sender, shouldSaveToStorage = true) {
-            if (chatbox.querySelector('.welcome-message')) {
+            if (chatbox.querySelector('.welcome-message') && chatbox.children.length === 1) {
                 chatbox.innerHTML = '';
             }
 
@@ -292,7 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const avatar = document.createElement('div');
             avatar.className = `avatar ${sender}-avatar`;
-            avatar.textContent = sender === 'user' ? 'Y' : 'P'; // You : Prep-Portal
+            avatar.textContent = sender === 'user' ? 'Y' : 'P'; 
 
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}-message`;
@@ -300,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sender === 'bot') {
                 messageDiv.innerHTML = formatBotMessageContent(message);
             } else {
-                messageDiv.innerHTML = escapeHtml(message).replace(/\n/g, '<br>'); // User messages: escape and nl2br
+                messageDiv.innerHTML = escapeHtml(message).replace(/\n/g, '<br>'); 
             }
 
             if (sender === 'bot') {
@@ -327,31 +330,34 @@ document.addEventListener('DOMContentLoaded', () => {
             if (shouldSaveToStorage && saveToHistoryEnabled && currentChatId) {
                 saveMessageToLocalStorage(message, sender);
             }
-            chatbox.scrollTop = chatbox.scrollHeight;
+             // Scroll to bottom smoothly
+            chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
         }
 
         function saveMessageToLocalStorage(message, sender) {
             let chat = chatHistoryData.find(c => c.id === currentChatId);
-            if (!chat) {
-                chat = { id: currentChatId, title: null, messages: [], lastUpdated: Date.now() };
-                chatHistoryData.push(chat);
+            if (!chat) { // Should have been created by startNewChat or found by loadChat
+                // This case might happen if currentChatId is somehow not set, create it.
+                 console.warn("Chat not found in saveMessageToLocalStorage, creating new one for ID:", currentChatId);
+                 chat = { id: currentChatId, title: null, messages: [], lastUpdated: Date.now() };
+                 chatHistoryData.push(chat);
             }
             chat.messages.push({ message, sender, timestamp: Date.now() });
             chat.lastUpdated = Date.now();
-            if (!chat.title && sender === 'user' && chat.messages.filter(m=>m.sender==='user').length === 1) { // Set title on first user message
-                chat.title = message.substring(0,30);
+            if (!chat.title && sender === 'user' && chat.messages.filter(m=>m.sender==='user').length === 1) { 
+                chat.title = message.substring(0,30) + (message.length > 30 ? "..." : "");
             }
-            localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+            localStorage.setItem('geminiChatHistoryPrepPortal', JSON.stringify(chatHistoryData));
             renderChatHistoryList();
         }
 
         let typingIndicatorElement = null;
         function showTypingIndicator() {
-            if (typingIndicatorElement) return; // Already showing
+            if (typingIndicatorElement && chatbox.contains(typingIndicatorElement)) return; 
 
             const container = document.createElement('div');
             container.className = 'message-container bot-message-container';
-            typingIndicatorElement = container; // Store ref
+            typingIndicatorElement = container; 
 
             const avatar = document.createElement('div');
             avatar.className = 'avatar bot-avatar';
@@ -367,10 +373,10 @@ document.addEventListener('DOMContentLoaded', () => {
             container.appendChild(avatar);
             container.appendChild(typingDiv);
             chatbox.appendChild(container);
-            chatbox.scrollTop = chatbox.scrollHeight;
+            chatbox.scrollTo({ top: chatbox.scrollHeight, behavior: 'smooth' });
         }
         function removeTypingIndicator() {
-            if (typingIndicatorElement) {
+            if (typingIndicatorElement && chatbox.contains(typingIndicatorElement)) {
                 typingIndicatorElement.remove();
                 typingIndicatorElement = null;
             }
@@ -380,10 +386,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const messageText = userInput.value.trim();
             if (!messageText) return;
 
-            if (!currentChatId) { // If no chat is active, start a new one
+            if (!currentChatId) { 
                 startNewChat();
-                 // Need a slight delay for currentChatId to be set if startNewChat is async or has timeouts
-                await new Promise(resolve => setTimeout(resolve, 0));
+                // Since startNewChat is synchronous and updates currentChatId,
+                // we can proceed. If it were async, await would be needed.
             }
 
             userInput.value = '';
@@ -391,9 +397,10 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessageToUI(messageText, 'user', true);
             showTypingIndicator();
 
-            const currentChat = chatHistoryData.find(c => c.id === currentChatId);
-            const historyForAPI = currentChat?.messages
-                .slice(0, -1) // Exclude the current user message just added to UI
+            const currentChatSession = chatHistoryData.find(c => c.id === currentChatId);
+            // Prepare history: all messages in the current chat *before* the one just sent by the user.
+            const historyForAPI = currentChatSession?.messages
+                .slice(0, -1) // Exclude the last message (the user's current input)
                 .map(msg => ({
                     role: msg.sender === 'user' ? 'user' : 'model',
                     parts: [{ text: msg.message }]
@@ -405,13 +412,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         question: messageText,
-                        chatHistory: historyForAPI
+                        chatHistory: historyForAPI 
                     })
                 });
                 removeTypingIndicator();
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                    throw new Error(errorData.error || `Server error: ${response.status} ${response.statusText}`);
                 }
                 const data = await response.json();
                 addMessageToUI(data.answer, 'bot', true);
@@ -431,34 +438,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // Click outside to close mobile sidebar
         document.addEventListener('click', (e) => {
             if (window.innerWidth < 768 && sidebar.classList.contains('active') &&
-                !sidebar.contains(e.target) && e.target !== mobileMenuBtn && !mobileMenuBtn.contains(e.target)) {
+                !sidebar.contains(e.target) && 
+                e.target !== mobileMenuBtn && !mobileMenuBtn.contains(e.target) // Check if click is on button itself or its icon
+                ) {
                 sidebar.classList.remove('active');
                 mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
             }
         });
 
-        // Initialize
+        // --- Initialize ---
         initTheme();
         loadSavePreference();
-        renderChatHistoryList();
+        // renderChatHistoryList(); // Called by startNewChat or loadChat
 
-        // Load last active chat or start new
-        const lastChatId = localStorage.getItem('lastActiveChatId');
-        const lastChat = chatHistoryData.find(c => c.id === parseInt(lastChatId));
-
-        if (lastChat) {
-            loadChat(lastChat.id);
-        } else if (chatHistoryData.length > 0) {
-            loadChat(chatHistoryData[0].id); // Load most recent if no last active
-        } else {
-            startNewChat();
+        const lastChatIdString = localStorage.getItem('prepPortalLastActiveChatId'); // Unique LS Key
+        const lastChatId = lastChatIdString ? parseInt(lastChatIdString) : null;
+        
+        // Attempt to find the last active chat
+        let chatToLoad = null;
+        if (lastChatId) {
+            chatToLoad = chatHistoryData.find(c => c.id === lastChatId);
         }
-        // Persist last active chat ID
+
+        if (chatToLoad) {
+            loadChat(chatToLoad.id);
+        } else if (chatHistoryData.length > 0) {
+            // If no last active or last active not found, load the most recent valid chat
+            chatHistoryData.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0)); // Ensure sorted
+            loadChat(chatHistoryData[0].id); 
+        } else {
+            startNewChat(); // Start fresh if no history at all
+        }
+        
         window.addEventListener('beforeunload', () => {
             if(currentChatId) {
-                localStorage.setItem('lastActiveChatId', currentChatId);
+                localStorage.setItem('prepPortalLastActiveChatId', currentChatId.toString());
             }
         });
 
