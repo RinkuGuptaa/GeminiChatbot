@@ -130,9 +130,7 @@
                 border-right: 1px solid var(--border);
                 border-bottom: none;
             }
-            .sidebar-content {
-                 /* height: calc(100vh - 48px); Let flex-grow handle this */
-            }
+           
             .main {
                 width: calc(100% - 280px);
                 height: 100vh;
