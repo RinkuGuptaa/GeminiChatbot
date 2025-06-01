@@ -1,429 +1,465 @@
- document.addEventListener('DOMContentLoaded', () => {
-            const chatbox = document.getElementById('chatbox');
-            const userInput = document.getElementById('userInput');
-            const sendButton = document.getElementById('sendButton');
-            const newChatBtn = document.getElementById('newChatBtn');
-            const chatHistory = document.getElementById('chatHistory');
-            const themeToggle = document.getElementById('themeToggle');
-            const sidebar = document.getElementById('sidebar');
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-            const saveToggle = document.getElementById('saveToggle');
-            const body = document.body;
-            
-            let currentChatId = Date.now();
-            let chatHistoryData = JSON.parse(localStorage.getItem('chatHistory')) || [];
-            let isRenaming = null;
-            let saveToHistory = true;
+document.addEventListener('DOMContentLoaded', () => {
+        const chatbox = document.getElementById('chatbox');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const chatHistoryEl = document.getElementById('chatHistoryEl');
+        const themeToggle = document.getElementById('themeToggle');
+        const sidebar = document.getElementById('sidebar');
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const saveToggle = document.getElementById('saveToggle');
+        const body = document.body;
 
-            // Initialize theme
-            function initTheme() {
-                const savedTheme = localStorage.getItem('theme');
-                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                
-                if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-                    body.classList.add('dark-mode');
-                    body.classList.remove('light-mode');
-                    themeToggle.textContent = '☀️';
-                    themeToggle.title = 'Switch to light mode';
-                } else {
-                    body.classList.add('light-mode');
-                    body.classList.remove('dark-mode');
-                    themeToggle.textContent = '🌙';
-                    themeToggle.title = 'Switch to dark mode';
-                }
+        let currentChatId = null; // Will be set by startNewChat or loadChat
+        let chatHistoryData = JSON.parse(localStorage.getItem('geminiChatHistory')) || [];
+        let isRenaming = null;
+        let saveToHistoryEnabled = true; // Default, will be updated from localStorage
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+                body.classList.add('dark-mode');
+                body.classList.remove('light-mode');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                themeToggle.title = 'Switch to light mode';
+            } else {
+                body.classList.add('light-mode');
+                body.classList.remove('dark-mode');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                themeToggle.title = 'Switch to dark mode';
             }
+        }
 
-            // Toggle theme
-            themeToggle.addEventListener('click', () => {
-                if (body.classList.contains('dark-mode')) {
-                    body.classList.remove('dark-mode');
-                    body.classList.add('light-mode');
-                    localStorage.setItem('theme', 'light');
-                    themeToggle.textContent = '🌙';
-                    themeToggle.title = 'Switch to dark mode';
-                } else {
-                    body.classList.remove('light-mode');
-                    body.classList.add('dark-mode');
-                    localStorage.setItem('theme', 'dark');
-                    themeToggle.textContent = '☀️';
-                    themeToggle.title = 'Switch to light mode';
-                }
-            });
-
-            // Toggle mobile menu
-            mobileMenuBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('active');
-            });
-
-            // Toggle save to history
-            saveToggle.addEventListener('change', function() {
-                saveToHistory = this.checked;
-            });
-
-            // Auto-resize textarea
-            userInput.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-            });
-
-            // Initialize chat history
-            function loadChatHistory() {
-                chatHistory.innerHTML = '';
-                
-                if (chatHistoryData.length === 0) {
-                    const emptyMsg = document.createElement('div');
-                    emptyMsg.style.padding = '15px';
-                    emptyMsg.style.textAlign = 'center';
-                    emptyMsg.style.color = 'var(--text)';
-                    emptyMsg.style.opacity = '0.7';
-                    emptyMsg.textContent = 'No chat history yet';
-                    chatHistory.appendChild(emptyMsg);
-                    return;
-                }
-                
-                chatHistoryData.forEach(chat => {
-                    const chatItem = document.createElement('div');
-                    chatItem.className = 'chat-item';
-                    
-                    if (isRenaming === chat.id) {
-                        const renameInput = document.createElement('input');
-                        renameInput.className = 'rename-input';
-                        renameInput.value = chat.title || chat.messages[0]?.message.substring(0, 30) || 'New chat';
-                        renameInput.addEventListener('keypress', (e) => {
-                            if (e.key === 'Enter') {
-                                chat.title = renameInput.value;
-                                localStorage.setItem('chatHistory', JSON.stringify(chatHistoryData));
-                                isRenaming = null;
-                                loadChatHistory();
-                            }
-                        });
-                        renameInput.addEventListener('blur', () => {
-                            chat.title = renameInput.value;
-                            localStorage.setItem('chatHistory', JSON.stringify(chatHistoryData));
-                            isRenaming = null;
-                            loadChatHistory();
-                        });
-                        chatItem.appendChild(renameInput);
-                        renameInput.focus();
-                    } else {
-                        const chatText = document.createElement('div');
-                        chatText.className = 'chat-item-text';
-                        chatText.textContent = chat.title || chat.messages[0]?.message.substring(0, 30) + (chat.messages[0]?.message.length > 30 ? '...' : '') || 'New chat';
-                        
-                        const chatActions = document.createElement('div');
-                        chatActions.className = 'chat-item-actions';
-                        
-                        const renameBtn = document.createElement('button');
-                        renameBtn.className = 'chat-action-btn';
-                        renameBtn.innerHTML = '✏️';
-                        renameBtn.title = 'Rename chat';
-                        renameBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            isRenaming = chat.id;
-                            loadChatHistory();
-                        });
-                        
-                        const deleteBtn = document.createElement('button');
-                        deleteBtn.className = 'chat-action-btn';
-                        deleteBtn.innerHTML = '🗑️';
-                        deleteBtn.title = 'Delete chat';
-                        deleteBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            deleteChat(chat.id);
-                        });
-                        
-                        chatActions.appendChild(renameBtn);
-                        chatActions.appendChild(deleteBtn);
-                        chatItem.appendChild(chatText);
-                        chatItem.appendChild(chatActions);
-                    }
-                    
-                    chatItem.addEventListener('click', () => {
-                        loadChat(chat.id);
-                        if (window.innerWidth < 768) {
-                            sidebar.classList.remove('active');
-                        }
-                    });
-                    chatHistory.appendChild(chatItem);
-                });
+        themeToggle.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            body.classList.toggle('light-mode');
+            if (body.classList.contains('dark-mode')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                themeToggle.title = 'Switch to light mode';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                themeToggle.title = 'Switch to dark mode';
             }
-
-            // Delete a chat from history
-            function deleteChat(chatId) {
-                chatHistoryData = chatHistoryData.filter(c => c.id !== chatId);
-                localStorage.setItem('chatHistory', JSON.stringify(chatHistoryData));
-                
-                if (currentChatId === chatId) {
-                    currentChatId = Date.now();
-                    chatbox.innerHTML = '';
-                    showWelcomeMessage();
-                }
-                
-                loadChatHistory();
-            }
-
-            // Show welcome message
-            function showWelcomeMessage() {
-                chatbox.innerHTML = `
-                    <div class="welcome-message">
-                        <h2>Welcome to Gemini</h2>
-                        <p>Start a new chat or select from your history</p>
-                        <p>Ask me anything!</p>
-                    </div>
-                `;
-            }
-
-            // Load a specific chat
-            function loadChat(chatId) {
-                currentChatId = chatId;
-                const chat = chatHistoryData.find(c => c.id === chatId);
-                chatbox.innerHTML = '';
-                
-                if (chat) {
-                    chat.messages.forEach(msg => {
-                        addMessage(msg.message, msg.sender, false);
-                    });
-                } else {
-                    addMessage("Hello! I'm Gemini. How can I assist you today?", 'bot', false);
-                }
-            }
-
-            // Enhanced content formatting with structured paragraphs
-            function formatContent(content) {
-                // First split into paragraphs while preserving code blocks
-                let paragraphs = [];
-                let tempContent = content;
-                
-                // Handle code blocks first
-                while (tempContent.includes('```')) {
-                    const codeStart = tempContent.indexOf('```');
-                    const beforeCode = tempContent.substring(0, codeStart);
-                    
-                    if (beforeCode) {
-                        paragraphs.push(...beforeCode.split('\n\n').filter(p => p.trim()));
-                    }
-                    
-                    const codeEnd = tempContent.indexOf('```', codeStart + 3);
-                    if (codeEnd === -1) break;
-                    
-                    const codeBlock = tempContent.substring(codeStart, codeEnd + 3);
-                    paragraphs.push(codeBlock);
-                    
-                    tempContent = tempContent.substring(codeEnd + 3);
-                }
-                
-                // Add remaining paragraphs
-                if (tempContent) {
-                    paragraphs.push(...tempContent.split('\n\n').filter(p => p.trim()));
-                }
-                
-                // Process each paragraph
-                let formattedContent = paragraphs.map(para => {
-                    // Handle code blocks
-                    if (para.startsWith('```') && para.endsWith('```')) {
-                        const langMatch = para.match(/^```([a-z]*)/);
-                        const lang = langMatch ? langMatch[1] : '';
-                        const codeContent = para.slice(lang.length + 3, -3).trim();
-                        return `<pre><code class="${lang}">${codeContent}</code></pre>`;
-                    }
-                    
-                    // Handle lists
-                    if (para.match(/^[\s]*[\-\*\+]\s/) || para.match(/^[\s]*\d+\.\s/)) {
-                        const listItems = para.split('\n').filter(item => item.trim());
-                        const isOrdered = para.match(/^[\s]*\d+\.\s/);
-                        
-                        const listContent = listItems.map(item => {
-                            const cleanedItem = item.replace(/^[\s]*[\-\*\+]\s|^[\s]*\d+\.\s/, '');
-                            return `<li>${processInlineFormatting(cleanedItem)}</li>`;
-                        }).join('');
-                        
-                        return isOrdered ? `<ol>${listContent}</ol>` : `<ul>${listContent}</ul>`;
-                    }
-                    
-                    // Handle headings
-                    if (para.match(/^#{1,3}\s/)) {
-                        const level = para.match(/^#+/)[0].length;
-                        const headingText = para.replace(/^#+\s/, '');
-                        return `<h${level}>${processInlineFormatting(headingText)}</h${level}>`;
-                    }
-                    
-                    // Handle blockquotes
-                    if (para.startsWith('> ')) {
-                        const quoteText = para.substring(2);
-                        return `<blockquote>${processInlineFormatting(quoteText)}</blockquote>`;
-                    }
-                    
-                    // Regular paragraph
-                    return `<p>${processInlineFormatting(para)}</p>`;
-                }).join('');
-                
-                return formattedContent;
-            }
-
-            // Process inline formatting within paragraphs
-            function processInlineFormatting(text) {
-                return text
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                    .replace(/_(.*?)_/g, '<u>$1</u>')
-                    .replace(/`([^`]+)`/g, '<code>$1</code>')
-                    .replace(/\n/g, '<br>');
-            }
-
-            // Add message to chat
-            function addMessage(message, sender, shouldSave = true) {
-                // Remove welcome message if it's the first message
-                if (chatbox.querySelector('.welcome-message')) {
-                    chatbox.innerHTML = '';
-                }
-                
-                const container = document.createElement('div');
-                container.className = `message-container ${sender}-message-container`;
-                
-                const avatar = document.createElement('div');
-                avatar.className = `avatar ${sender}-avatar`;
-                avatar.textContent = sender === 'user' ? 'Y' : 'G';
-                
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${sender}-message`;
-                messageDiv.innerHTML = sender === 'bot' ? formatContent(message) : processInlineFormatting(message);
-                
-                if (sender === 'bot') {
-                    const copyBtn = document.createElement('button');
-                    copyBtn.className = 'copy-btn';
-                    copyBtn.textContent = 'Copy';
-                    copyBtn.addEventListener('click', () => {
-                        navigator.clipboard.writeText(message);
-                        copyBtn.textContent = 'Copied!';
-                        setTimeout(() => copyBtn.textContent = 'Copy', 2000);
-                    });
-                    messageDiv.appendChild(copyBtn);
-                }
-                
-                container.appendChild(avatar);
-                container.appendChild(messageDiv);
-                chatbox.appendChild(container);
-                
-                if (shouldSave && saveToHistory) {
-                    saveMessageToHistory(message, sender);
-                }
-                
-                chatbox.scrollTop = chatbox.scrollHeight;
-            }
-
-            // Save message to chat history
-            function saveMessageToHistory(message, sender) {
-                let chat = chatHistoryData.find(c => c.id === currentChatId);
-                
-                if (!chat) {
-                    chat = { id: currentChatId, title: null, messages: [] };
-                    chatHistoryData.unshift(chat);
-                }
-                
-                chat.messages.push({ message, sender, timestamp: Date.now() });
-                localStorage.setItem('chatHistory', JSON.stringify(chatHistoryData));
-                loadChatHistory();
-            }
-
-            // Show typing indicator
-            function showTyping() {
-                const container = document.createElement('div');
-                container.className = 'message-container bot-message-container';
-                container.id = 'typing-indicator';
-                
-                const avatar = document.createElement('div');
-                avatar.className = 'avatar bot-avatar';
-                avatar.textContent = 'G';
-                
-                const typingDiv = document.createElement('div');
-                typingDiv.className = 'typing-indicator';
-                
-                for (let i = 0; i < 3; i++) {
-                    const dot = document.createElement('div');
-                    dot.className = 'typing-dot';
-                    typingDiv.appendChild(dot);
-                }
-                
-                container.appendChild(avatar);
-                container.appendChild(typingDiv);
-                chatbox.appendChild(container);
-                chatbox.scrollTop = chatbox.scrollHeight;
-                
-                return container;
-            }
-
-            // Send message to server
-            async function sendMessage() {
-                const message = userInput.value.trim();
-                if (!message) return;
-                
-                userInput.value = '';
-                userInput.style.height = 'auto';
-                addMessage(message, 'user', true);
-                
-                const typingIndicator = showTyping();
-                
-                try {
-                    const currentChat = chatHistoryData.find(c => c.id === currentChatId);
-                    const chatHistory = currentChat?.messages.map(msg => ({
-                        sender: msg.sender,
-                        message: msg.message
-                    })) || [];
-                    
-                    const response = await fetch('/ask', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            question: message,
-                            chatHistory: chatHistory
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(await response.text());
-                    }
-                    
-                    const data = await response.json();
-                    chatbox.removeChild(typingIndicator);
-                    addMessage(data.answer, 'bot', false); // Don't save bot responses to history
-                    
-                } catch (error) {
-                    chatbox.removeChild(typingIndicator);
-                    addMessage('Sorry, something went wrong. Please try again.', 'bot', false);
-                    console.error('Error:', error);
-                }
-            }
-
-            // New chat button
-            newChatBtn.addEventListener('click', () => {
-                currentChatId = Date.now();
-                chatbox.innerHTML = '';
-                showWelcomeMessage();
-                if (window.innerWidth < 768) {
-                    sidebar.classList.remove('active');
-                }
-            });
-
-            // Event listeners
-            sendButton.addEventListener('click', sendMessage);
-            userInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-
-            // Close sidebar when clicking outside on mobile
-            document.addEventListener('click', (e) => {
-                if (window.innerWidth < 768 && 
-                    !sidebar.contains(e.target) && 
-                    e.target !== mobileMenuBtn) {
-                    sidebar.classList.remove('active');
-                }
-            });
-
-            // Initialize
-            initTheme();
-            loadChatHistory();
-            showWelcomeMessage();
         });
+
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            mobileMenuBtn.innerHTML = sidebar.classList.contains('active') ? '<i class="fas fa-times"></i>' : '<i class="fas fa-bars"></i>';
+        });
+
+        saveToggle.addEventListener('change', function() {
+            saveToHistoryEnabled = this.checked;
+            localStorage.setItem('saveChatHistoryPreference', saveToHistoryEnabled);
+        });
+
+        function loadSavePreference() {
+            const savedPref = localStorage.getItem('saveChatHistoryPreference');
+            if (savedPref !== null) {
+                saveToHistoryEnabled = JSON.parse(savedPref);
+                saveToggle.checked = saveToHistoryEnabled;
+            } else {
+                saveToggle.checked = true; // Default if not set
+                saveToHistoryEnabled = true;
+            }
+        }
+        
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            const newHeight = Math.min(this.scrollHeight, 120); // Max height 120px
+            this.style.height = newHeight + 'px';
+        });
+
+        function renderChatHistoryList() {
+            chatHistoryEl.innerHTML = '';
+            if (chatHistoryData.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.style.padding = '15px';
+                emptyMsg.style.textAlign = 'center';
+                emptyMsg.style.color = 'var(--text)';
+                emptyMsg.style.opacity = '0.7';
+                emptyMsg.textContent = 'No chat history yet';
+                chatHistoryEl.appendChild(emptyMsg);
+                return;
+            }
+
+            chatHistoryData.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+
+            chatHistoryData.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item';
+                if (chat.id === currentChatId) {
+                    chatItem.style.backgroundColor = 'var(--primary-dark)'; // Highlight active chat
+                    chatItem.style.color = 'white';
+                }
+
+                if (isRenaming === chat.id) {
+                    const renameInput = document.createElement('input');
+                    renameInput.className = 'rename-input';
+                    renameInput.value = chat.title || (chat.messages[0]?.message.substring(0, 30) || 'New chat');
+                    const handleRename = () => {
+                        const newTitle = renameInput.value.trim();
+                        if (newTitle) chat.title = newTitle;
+                        chat.lastUpdated = Date.now();
+                        localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+                        isRenaming = null;
+                        renderChatHistoryList();
+                    };
+                    renameInput.addEventListener('keypress', e => { if (e.key === 'Enter') handleRename(); });
+                    renameInput.addEventListener('blur', handleRename);
+                    chatItem.appendChild(renameInput);
+                    setTimeout(() => renameInput.focus(), 0);
+                } else {
+                    const chatText = document.createElement('div');
+                    chatText.className = 'chat-item-text';
+                    const firstUserMsg = chat.messages.find(m => m.sender === 'user');
+                    chatText.textContent = chat.title || (firstUserMsg?.message.substring(0, 25) + (firstUserMsg?.message.length > 25 ? '...' : '')) || `Chat ${chat.id.toString().slice(-4)}`;
+                    if (chat.id === currentChatId) chatText.style.color = 'white';
+
+
+                    const chatActions = document.createElement('div');
+                    chatActions.className = 'chat-item-actions';
+
+                    const renameBtn = document.createElement('button');
+                    renameBtn.className = 'chat-action-btn';
+                    renameBtn.innerHTML = '<i class="fas fa-pen"></i>';
+                    renameBtn.title = 'Rename chat';
+                    if (chat.id === currentChatId) renameBtn.style.color = 'white';
+                    renameBtn.addEventListener('click', e => { e.stopPropagation(); isRenaming = chat.id; renderChatHistoryList(); });
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'chat-action-btn';
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                    deleteBtn.title = 'Delete chat';
+                     if (chat.id === currentChatId) deleteBtn.style.color = 'white';
+                    deleteBtn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete "${chatText.textContent}"?`)) deleteChat(chat.id);
+                    });
+
+                    chatActions.appendChild(renameBtn);
+                    chatActions.appendChild(deleteBtn);
+                    chatItem.appendChild(chatText);
+                    chatItem.appendChild(chatActions);
+                }
+                chatItem.addEventListener('click', () => {
+                    loadChat(chat.id);
+                    if (window.innerWidth < 768 && sidebar.classList.contains('active')) {
+                        sidebar.classList.remove('active');
+                        mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+                    }
+                });
+                chatHistoryEl.appendChild(chatItem);
+            });
+        }
+
+        function deleteChat(chatIdToDelete) {
+            chatHistoryData = chatHistoryData.filter(c => c.id !== chatIdToDelete);
+            localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+            if (currentChatId === chatIdToDelete) {
+                startNewChat();
+            }
+            renderChatHistoryList();
+        }
+
+        function showWelcomeMessage() {
+            chatbox.innerHTML = `
+                <div class="welcome-message">
+                    <h2>Welcome to Prep-Portal!</h2>
+                    <p>Start a new chat or select from your history.</p>
+                    <p>Ask me anything!</p>
+                </div>`;
+        }
+
+        function startNewChat() {
+            currentChatId = Date.now();
+            chatbox.innerHTML = '';
+            showWelcomeMessage();
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            renderChatHistoryList(); // To unhighlight previous active chat
+        }
+        
+        newChatBtn.addEventListener('click', () => {
+            startNewChat();
+            if (window.innerWidth < 768 && sidebar.classList.contains('active')) {
+                sidebar.classList.remove('active');
+                mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+            }
+        });
+
+        function loadChat(chatIdToLoad) {
+            const chat = chatHistoryData.find(c => c.id === chatIdToLoad);
+            if (!chat) {
+                console.warn("Chat not found, starting new one:", chatIdToLoad);
+                startNewChat(); // Fallback if chat is somehow missing
+                return;
+            }
+            currentChatId = chatIdToLoad;
+            chatbox.innerHTML = '';
+            chat.messages.forEach(msg => addMessageToUI(msg.message, msg.sender, false));
+            chatbox.scrollTop = chatbox.scrollHeight;
+            renderChatHistoryList(); // To highlight current active chat
+        }
+        
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&")
+                 .replace(/</g, "<")
+                 .replace(/>/g, ">")
+                 .replace(/'/g, "'");
+        }
+
+        function formatBotMessageContent(content) {
+            // Basic escaping first for safety, then apply markdown-like transformations
+            let htmlContent = escapeHtml(content);
+
+            // Code blocks (```lang\ncode```) - Handle multiline correctly
+            htmlContent = htmlContent.replace(/```([a-zA-Z]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                // Unescape things that shouldn't be escaped inside code blocks
+                const unescapedCode = code
+                    .replace(/</g, '<')
+                    .replace(/>/g, '>')
+                    .replace(/&/g, '&');
+                return `<pre><code class="language-${lang || 'plaintext'}">${unescapedCode}</code></pre>`;
+            });
+             // Simpler code blocks (```code```) for single line or unspecified lang
+            htmlContent = htmlContent.replace(/```([\s\S]*?)```/g, (match, code) => {
+                const unescapedCode = code
+                    .replace(/</g, '<')
+                    .replace(/>/g, '>')
+                    .replace(/&/g, '&');
+                return `<pre><code class="language-plaintext">${unescapedCode}</code></pre>`;
+            });
+
+
+            // Bold: **text**
+            htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Italics: *text*
+            htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+             // Underline: _text_ (less common in Markdown, but was in your original)
+            htmlContent = htmlContent.replace(/_(.*?)_/g, '<u>$1</u>');
+            // Inline code: `code`
+            htmlContent = htmlContent.replace(/`([^`]+)`/g, (match, code) => `<code>${escapeHtml(code)}</code>`); // Re-escape code content just in case
+
+            // Headlines: #, ##, ###
+            htmlContent = htmlContent.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+            htmlContent = htmlContent.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+            htmlContent = htmlContent.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+            // Unordered lists: - item or * item
+            htmlContent = htmlContent.replace(/^[\s]*[\-\*] (.*)/gim, '<li>$1</li>');
+            htmlContent = htmlContent.replace(/<\/li>\n<li>/gim, '</li><li>'); // Fix newlines between list items
+            htmlContent = htmlContent.replace(/((<li>.*<\/li>\s*)+)/gim, '<ul>$1</ul>');
+
+
+            // Ordered lists: 1. item
+            htmlContent = htmlContent.replace(/^[\s]*\d+\. (.*)/gim, '<li>$1</li>');
+            // htmlContent = htmlContent.replace(/<\/li>\n<li>/gim, '</li><li>'); // Already handled
+            htmlContent = htmlContent.replace(/((<li>.*<\/li>\s*)+)/gim, (match, p1, offset, string) => {
+                 // Check if it's already wrapped in <ul> to avoid double wrapping after unordered list pass
+                const preceedingChar = offset > 4 ? string.substring(offset-4, offset) : "";
+                if (preceedingChar === "<ul>") return p1; // already in ul
+                return /<ul><li>.*<\/li><\/ul>/.test(match) ? match :'<ol>$1</ol>';
+            });
+
+
+            // Blockquotes: > quote
+            htmlContent = htmlContent.replace(/^> (.*)/gim, '<blockquote>$1</blockquote>');
+            
+            // Paragraphs: Split by double newlines, then wrap non-list/block elements
+            // This is tricky after other replacements. Simpler: wrap remaining lines in <p> if not already in block.
+            // For simplicity now, just replace single newlines with <br> for non-block elements
+            // A more robust parser would build an AST.
+             return htmlContent.split(/\n\n+|\r\n\r\n+/).map(paragraph => {
+                if (paragraph.match(/^<(ul|ol|li|h[1-3]|blockquote|pre)/)) {
+                    return paragraph; // Already a block element
+                }
+                return `<p>${paragraph.replace(/\n|\r\n/g, '<br>')}</p>`; // Wrap in <p> and convert inner newlines
+            }).join('');
+        }
+
+
+        function addMessageToUI(message, sender, shouldSaveToStorage = true) {
+            if (chatbox.querySelector('.welcome-message')) {
+                chatbox.innerHTML = '';
+            }
+
+            const container = document.createElement('div');
+            container.className = `message-container ${sender}-message-container`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `avatar ${sender}-avatar`;
+            avatar.textContent = sender === 'user' ? 'Y' : 'P'; // You : Prep-Portal
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+
+            if (sender === 'bot') {
+                messageDiv.innerHTML = formatBotMessageContent(message);
+            } else {
+                messageDiv.innerHTML = escapeHtml(message).replace(/\n/g, '<br>'); // User messages: escape and nl2br
+            }
+
+            if (sender === 'bot') {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                copyBtn.title = 'Copy text';
+                copyBtn.addEventListener('click', () => {
+                    navigator.clipboard.writeText(message).then(() => {
+                        copyBtn.innerHTML = '<i class="fas fa-check"></i>'; copyBtn.title = 'Copied!';
+                        setTimeout(() => { copyBtn.innerHTML = '<i class="fas fa-copy"></i>'; copyBtn.title = 'Copy text'; }, 2000);
+                    }).catch(err => console.error('Failed to copy: ', err));
+                });
+                messageDiv.appendChild(copyBtn);
+            }
+
+            if (sender === 'user') {
+                container.appendChild(messageDiv); container.appendChild(avatar);
+            } else {
+                container.appendChild(avatar); container.appendChild(messageDiv);
+            }
+            chatbox.appendChild(container);
+
+            if (shouldSaveToStorage && saveToHistoryEnabled && currentChatId) {
+                saveMessageToLocalStorage(message, sender);
+            }
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function saveMessageToLocalStorage(message, sender) {
+            let chat = chatHistoryData.find(c => c.id === currentChatId);
+            if (!chat) {
+                chat = { id: currentChatId, title: null, messages: [], lastUpdated: Date.now() };
+                chatHistoryData.push(chat);
+            }
+            chat.messages.push({ message, sender, timestamp: Date.now() });
+            chat.lastUpdated = Date.now();
+            if (!chat.title && sender === 'user' && chat.messages.filter(m=>m.sender==='user').length === 1) { // Set title on first user message
+                chat.title = message.substring(0,30);
+            }
+            localStorage.setItem('geminiChatHistory', JSON.stringify(chatHistoryData));
+            renderChatHistoryList();
+        }
+
+        let typingIndicatorElement = null;
+        function showTypingIndicator() {
+            if (typingIndicatorElement) return; // Already showing
+
+            const container = document.createElement('div');
+            container.className = 'message-container bot-message-container';
+            typingIndicatorElement = container; // Store ref
+
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar bot-avatar';
+            avatar.textContent = 'P';
+
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'typing-indicator-container';
+            for (let i = 0; i < 3; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'typing-dot';
+                typingDiv.appendChild(dot);
+            }
+            container.appendChild(avatar);
+            container.appendChild(typingDiv);
+            chatbox.appendChild(container);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+        function removeTypingIndicator() {
+            if (typingIndicatorElement) {
+                typingIndicatorElement.remove();
+                typingIndicatorElement = null;
+            }
+        }
+
+        async function sendMessageToServer() {
+            const messageText = userInput.value.trim();
+            if (!messageText) return;
+
+            if (!currentChatId) { // If no chat is active, start a new one
+                startNewChat();
+                 // Need a slight delay for currentChatId to be set if startNewChat is async or has timeouts
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            addMessageToUI(messageText, 'user', true);
+            showTypingIndicator();
+
+            const currentChat = chatHistoryData.find(c => c.id === currentChatId);
+            const historyForAPI = currentChat?.messages
+                .slice(0, -1) // Exclude the current user message just added to UI
+                .map(msg => ({
+                    role: msg.sender === 'user' ? 'user' : 'model',
+                    parts: [{ text: msg.message }]
+                })) || [];
+            
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: messageText,
+                        chatHistory: historyForAPI
+                    })
+                });
+                removeTypingIndicator();
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Server error: ${response.status}`);
+                }
+                const data = await response.json();
+                addMessageToUI(data.answer, 'bot', true);
+
+            } catch (error) {
+                removeTypingIndicator();
+                addMessageToUI(`Sorry, an error occurred: ${error.message}. Please try again.`, 'bot', false);
+                console.error('Error sending message:', error);
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessageToServer);
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessageToServer();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth < 768 && sidebar.classList.contains('active') &&
+                !sidebar.contains(e.target) && e.target !== mobileMenuBtn && !mobileMenuBtn.contains(e.target)) {
+                sidebar.classList.remove('active');
+                mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+            }
+        });
+
+        // Initialize
+        initTheme();
+        loadSavePreference();
+        renderChatHistoryList();
+
+        // Load last active chat or start new
+        const lastChatId = localStorage.getItem('lastActiveChatId');
+        const lastChat = chatHistoryData.find(c => c.id === parseInt(lastChatId));
+
+        if (lastChat) {
+            loadChat(lastChat.id);
+        } else if (chatHistoryData.length > 0) {
+            loadChat(chatHistoryData[0].id); // Load most recent if no last active
+        } else {
+            startNewChat();
+        }
+        // Persist last active chat ID
+        window.addEventListener('beforeunload', () => {
+            if(currentChatId) {
+                localStorage.setItem('lastActiveChatId', currentChatId);
+            }
+        });
+
+    });
